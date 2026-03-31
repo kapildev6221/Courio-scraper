@@ -1,8 +1,5 @@
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const { log, randomUserAgent, randomViewport } = require('./utils');
-
-puppeteer.use(StealthPlugin());
+const puppeteer = require('puppeteer');
+const { log, BOT_USER_AGENT, VIEWPORT } = require('./utils');
 
 const MAX_CONCURRENT_TABS = 5;
 const RESTART_AFTER_REQUESTS = 50;
@@ -21,15 +18,12 @@ const BROWSER_ARGS = [
   '--disable-dev-shm-usage',
   '--disable-gpu',
   '--disable-extensions',
-  '--disable-blink-features=AutomationControlled',
   '--window-size=1920,1080',
   '--disable-background-timer-throttling',
   '--disable-backgrounding-occluded-windows',
   '--disable-renderer-backgrounding',
-  '--disable-infobars',
   '--no-first-run',
   '--no-default-browser-check',
-  '--disable-features=IsolateOrigins,site-per-process',
 ];
 
 async function launchBrowser() {
@@ -104,28 +98,12 @@ async function createContext(options = {}) {
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
 
-  const ua = options.userAgent || randomUserAgent();
-  const vp = options.viewport || randomViewport();
-
-  await page.setUserAgent(ua);
-  await page.setViewport(vp);
+  await page.setUserAgent(BOT_USER_AGENT);
+  await page.setViewport(VIEWPORT);
 
   await page.setExtraHTTPHeaders({
     'Accept-Language': 'en-US,en;q=0.9',
     'Accept-Encoding': 'gzip, deflate, br',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'cross-site',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1',
-    'Referer': 'https://www.google.com/',
-  });
-
-  await page.evaluateOnNewDocument(() => {
-    Object.defineProperty(navigator, 'webdriver', { get: () => false });
-    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-    window.chrome = { runtime: {} };
   });
 
   const loadResources = options.loadResources || false;
