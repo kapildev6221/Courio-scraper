@@ -1,4 +1,6 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 const { log, BOT_USER_AGENT, VIEWPORT } = require('./utils');
 
 const MAX_CONCURRENT_TABS = 5;
@@ -102,8 +104,14 @@ async function createContext(options = {}) {
   await page.setViewport(VIEWPORT);
 
   await page.setExtraHTTPHeaders({
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
     'Accept-Encoding': 'gzip, deflate, br',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
   });
 
   const loadResources = options.loadResources || false;

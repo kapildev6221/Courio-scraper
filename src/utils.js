@@ -1,4 +1,4 @@
-const BOT_USER_AGENT = 'CourioBot/1.0 (+https://couriodelivery.com)';
+const BOT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const VIEWPORT = { width: 1920, height: 1080 };
 
