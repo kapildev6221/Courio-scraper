@@ -1,145 +1,99 @@
 # Courio Scraper
 
-Production-grade stealth scraper microservice for live price extraction. Runs as a separate Railway service that the Courio app calls to scrape product prices, menu items, and store data from any website.
+AI-powered internet intelligence microservice for Kay — Courio's AI concierge.
+Combines Tavily AI search, Jina Reader, Google CSE, and Puppeteer into a single
+research pipeline synthesized by Claude Sonnet. Kay gets live, verified answers
+from the internet instead of guessing from training data.
 
 ## Stack
 
 - Node.js + Express
-- Puppeteer with bundled Chromium
-- puppeteer-extra + stealth plugin (anti-detection)
-- Docker (Railway-ready)
-
-## Anti-Detection
-
-- Stealth plugin bypasses bot detection (WebDriver, Chrome.runtime, plugins, etc.)
-- Randomized user-agents from 12 real Chrome/Firefox/Safari/Edge strings
-- Randomized viewport sizes (7 common resolutions)
-- Random human-like delays between actions
-- Realistic HTTP headers (Accept-Language, Sec-Fetch, Referer)
-- Fresh incognito context per request (clean cookies/state)
-- Image/font/media blocking for speed
-- Browser auto-restart every 50 requests
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `PORT` | No | `3001` | Server port |
-| `SCRAPER_API_KEY` | Yes | — | API key for authentication (x-api-key header) |
-| `ALLOWED_ORIGINS` | No | `localhost` | Comma-separated CORS origins |
+- Claude Sonnet (claude-sonnet-4-6) — synthesis and extraction
+- Tavily API — AI-native search with pre-extracted content + direct answers
+- Jina Reader (r.jina.ai) — free, no-key URL → clean markdown
+- Puppeteer + stealth plugin — JS-heavy site fallback
+- Google CSE — supplemental search breadth
+- In-memory TTL cache — no redundant scrapes
 
 ## Endpoints
 
-### `GET /health`
+### `GET /health` — No auth
 
-No auth required.
-
-```bash
-curl http://localhost:3001/health
-```
+### `POST /research` ← Primary endpoint for Kay
+Full pipeline: Tavily + Google search → Jina/Puppeteer read top pages → Sonnet synthesis.
+Returns a single synthesized answer string.
 
 ```json
-{
-  "status": "ok",
-  "uptime": 3600,
-  "activeTabs": 0,
-  "totalScrapes": 42,
-  "successRate": 97.6,
-  "browserConnected": true
-}
+{ "query": "Is Clay Oven on Pembina open right now?", "context": "Winnipeg delivery" }
 ```
 
-### `POST /scrape`
-
-Scrape a single URL.
-
-```bash
-curl -X POST http://localhost:3001/scrape \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key" \
-  -d '{
-    "url": "https://example.com/product/123",
-    "selectors": {
-      "name": "h1.product-title",
-      "price": ".price-current",
-      "description": "meta[name=description]"
-    },
-    "waitFor": ".price-current",
-    "scrollFirst": false,
-    "clickFirst": "#accept-cookies",
-    "jsEnabled": true,
-    "loadResources": false
-  }'
-```
+### `POST /search`
+Tavily + Google CSE in parallel. Returns ranked results + Tavily direct answer.
 
 ```json
-{
-  "success": true,
-  "data": {
-    "name": "Product Name",
-    "price": "$12.99",
-    "description": "Product description here"
-  },
-  "scrapedAt": "2026-03-30T01:00:00.000Z",
-  "responseTimeMs": 2340,
-  "retries": 0
-}
+{ "query": "pizza places open late Winnipeg", "maxResults": 5 }
 ```
 
-### `POST /scrape-multi`
-
-Scrape multiple URLs (up to 10, 3 at a time in parallel).
-
-```bash
-curl -X POST http://localhost:3001/scrape-multi \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key" \
-  -d '{
-    "targets": [
-      {
-        "url": "https://store.com/item/1",
-        "selectors": { "price": ".price" }
-      },
-      {
-        "url": "https://store.com/item/2",
-        "selectors": { "price": ".price" }
-      }
-    ]
-  }'
-```
+### `POST /read`
+Read any URL → clean markdown. Jina first, Puppeteer fallback.
 
 ```json
-{
-  "results": [
-    { "url": "https://store.com/item/1", "success": true, "data": { "price": "$5.99" }, "responseTimeMs": 1200 },
-    { "url": "https://store.com/item/2", "success": true, "data": { "price": "$3.49" }, "responseTimeMs": 1350 }
-  ],
-  "totalTimeMs": 1400
-}
+{ "url": "https://example.com/menu" }
 ```
 
-## Request Options
+### `POST /extract`
+Read a URL and answer a specific question with Sonnet.
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `url` | string | required | URL to scrape |
-| `selectors` | object | required | `{ key: "css selector" }` mapping |
-| `waitFor` | string | — | CSS selector to wait for before extracting |
-| `scrollFirst` | boolean | false | Scroll to bottom first (lazy-loaded content) |
-| `clickFirst` | string | — | CSS selector to click first (cookie banners, "show more") |
-| `jsEnabled` | boolean | true | Enable JavaScript on the page |
-| `loadResources` | boolean | false | Load images, fonts, stylesheets |
+```json
+{ "url": "https://restaurant.com", "question": "What are their hours on Sunday?" }
+```
+
+### `POST /price-check`
+Items → structured price JSON from live web search.
+
+```json
+{ "items": ["4L milk", "dozen eggs", "sourdough bread"], "location": "Winnipeg" }
+```
+
+### `POST /scrape` / `POST /scrape-multi` — Legacy selector-based scraping
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SCRAPER_API_KEY` | Yes | Auth key (x-api-key header) |
+| `ANTHROPIC_API_KEY` | Yes | Claude Sonnet for synthesis |
+| `TAVILY_API_KEY` | Yes | AI-native search (tavily.com) |
+| `GOOGLE_CSE_API_KEY` | No | Google Custom Search (supplemental) |
+| `GOOGLE_CSE_ID` | No | Google CSE engine ID |
+| `ALLOWED_ORIGINS` | No | CORS origins (default: localhost) |
+| `PORT` | No | Server port (default: 3001) |
+
+## Get a Tavily API Key
+
+1. Sign up at https://tavily.com
+2. Free tier: 1,000 searches/month
+3. Add `TAVILY_API_KEY` to Railway env vars
 
 ## Deploy to Railway
 
-1. Push this repo to GitHub
-2. Create a new Railway service from the repo
-3. Set environment variables: `SCRAPER_API_KEY`, `ALLOWED_ORIGINS`
-4. Railway auto-detects the Dockerfile and deploys
+1. Push to GitHub
+2. Create Railway service from repo
+3. Set env vars: `SCRAPER_API_KEY`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY`
+4. Railway auto-detects the Dockerfile
 
 ## Local Development
 
 ```bash
 npm install
-SCRAPER_API_KEY=test-key node src/server.js
+SCRAPER_API_KEY=test ANTHROPIC_API_KEY=sk-... TAVILY_API_KEY=tvly-... node src/server.js
 ```
+
+## Cache TTLs
+
+| Data type | TTL |
+|-----------|-----|
+| Search results | 15 min |
+| Page reads | 10 min |
+| Research answers | 10 min |
+| Price checks | 5 min |
